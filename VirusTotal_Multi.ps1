@@ -7,16 +7,17 @@ $failed = @()
 
 foreach ($file in $Args) {
     $PATH_TO_FILE = $file;
-    Write-Host "Uploading... ($PATH_TO_FILE)";
+    Write-Host "> $PATH_TO_FILE`n  Uploading...." -NoNewline;
     [string]$result = curl.exe --request POST `
-        --header 'accept: application/json' `
+    --header 'accept: application/json' `
         --header 'content-type: multipart/form-data' `
         --header "x-apikey: ${API_KEY}" `
         --form "file=@$PATH_TO_FILE" `
         'https://www.virustotal.com/api/v3/files' -s -w "!$%!#^&@!!%{http_code}";
         
+    Write-Host "Done!";
     if( -not $? )
-    {
+        {
         Write-Error "EXIT_CODE: $?"
         Write-Error "Something wrong happened when uploading $PATH_TO_FILE, skipping..."
         $failed += $PATH_TO_FILE
@@ -60,7 +61,7 @@ foreach ($file in $Args) {
     $sha256s[$PATH_TO_FILE] = $sha256;
 
     Set-Clipboard -Value "https://www.virustotal.com/gui/file/$sha256";
-    Write-Host "Uploaded!`nURL copied: https://www.virustotal.com/gui/file/${sha256}";
+    Write-Host "URL copied: https://www.virustotal.com/gui/file/${sha256}";
 }
 
 Write-Output "`n### Uploaded:";
@@ -106,7 +107,7 @@ function Report {
         $j = $json | ConvertFrom-Json;
         
         Write-Host "`n### ${file}";
-        Write-Host "  https://www.virustotal.com/gui/file/$($sha256s[$file])"
+        Write-Host "    https://www.virustotal.com/gui/file/$($sha256s[$file])"
         $tmp = if ($null -eq $j.data.attributes.times_submitted) { "?" } else { $j.data.attributes.times_submitted };
         Write-Host "Submitted: " -NoNewline; Write-Host "${tmp}";
         $tmp = if ($null -eq $j.data.attributes.reputation) { "?" } else { $j.data.attributes.reputation };
@@ -140,7 +141,7 @@ function Report {
             Write-Host -ForegroundColor Red "# Analysis data is not yet ready, try query again later.";
         }
         else {
-            Write-Host "# Analysis ↓↓↓↓↓";
+            Write-Host "# Analysis";
             Write-Host "Total: ${sum}";
             $msg = "Malicious: $($stats.malicious) / Suspicious: $($stats.suspicious) / Harmless: $($stats.harmless) / Undetected: $($stats.undetected) / Other: $($other)";
             if ($malicious -gt 0) {
@@ -159,28 +160,28 @@ function Report {
                 $analysis = $analysis.Value;
                 switch ($analysis.category) {
                     "malicious" {
-                        Write-Host -ForegroundColor Red "- $($analysis.engine_name) $($analysis.engine_version) $($analysis.method) $($analysis.result)";
+                        Write-Host -ForegroundColor Red "- $($analysis.engine_name) $($analysis.method) $($analysis.result)";
                     }
                     "suspicious" {
-                        Write-Host -ForegroundColor Yellow "- $($analysis.engine_name) $($analysis.engine_version) $($analysis.method) $($analysis.result)";
+                        Write-Host -ForegroundColor Yellow "- $($analysis.engine_name) $($analysis.method) $($analysis.result)";
                     }
                     "undetected" {}
                     "harmless" {}
                     "type-unsupported" {}
                     default {
-                        Write-Host "- $($analysis.engine_name) $($analysis.engine_version) $($analysis.method) $($analysis.result)";
+                        Write-Host "- [$($analysis.category)] $($analysis.engine_name) $($analysis.method) $($analysis.result)";
                     }
     
                 }
             }
-            Write-Host "# Analysis ↑↑↑↑↑";
+            Write-Host "";
         }
         
         if ($null -eq $j.data.attributes.sandbox_verdicts) {
             Write-Host -ForegroundColor Red "# Sandbox Verdicts data not found, it may be not available or not yet ready.";
         }
         else {
-            Write-Host "# Sandbox Verdicts ↓↓↓↓↓";
+            Write-Host "# Sandbox Verdicts";
             $suspicious = 0;
             $malicious = 0;
             $undetected = 0;
@@ -219,7 +220,7 @@ function Report {
                 }
             }
 
-            Write-Host "# Sandbox Verdicts ↑↑↑↑↑";
+            Write-Host "";
         }
 
 
@@ -227,7 +228,7 @@ function Report {
             Write-Host -ForegroundColor Red "# Crowdsourced data not found, it may be not available or not yet ready.";
         }
         else {
-            Write-Host "# Crowdsourced ↓↓↓↓↓";
+            Write-Host "# Crowdsourced";
             $stats = "High: ${j.data.attributes.crowdsourced_ids_stats.high} / Info: ${j.data.attributes.crowdsourced_ids_stats.info} / Medium: ${j.data.attributes.crowdsourced_ids_stats.medium} / Low: ${j.data.attributes.crowdsourced_ids_stats.low}";
             if ($j.data.attributes.crowdsourced_ids_stats.high -gt 0) {
                 Write-Host -ForegroundColor Red $stats;
@@ -255,7 +256,7 @@ function Report {
                 $msg = "- $($r.ruleset_name).$($r.rule_name) from $($r.source)`n  - $($r.description)";
                 Write-Host -ForegroundColor Red $msg;
             }
-            Write-Host "# Crowdsourced ↑↑↑↑↑";
+            Write-Host "";
         }
 
         if ($null -eq $j.data.attributes.crowdsourced_ai_results ) {
@@ -263,14 +264,14 @@ function Report {
         }
         else {
 
-            Write-Host "# Crowdsourced AIs ↓↓↓↓↓";
+            Write-Host "# Crowdsourced AIs";
             foreach ($r in $j.data.attributes.crowdsourced_ai_results) {
                 if ($r.verdict) { Write-Host "### $($r.verdict)"; }
                 Write-Host "### $($r.category) from $($r.source)";
                 Write-Host "------`n$($r.analysis)";
                 Write-Host "------";
             }
-            Write-Host "# Crowdsourced AIs ↑↑↑↑↑";
+            Write-Host "# Crowdsource";
         }
 
         if ($null -eq $j.data.attributes.sigma_analysis_stats) {
@@ -278,7 +279,7 @@ function Report {
         }
         else {
 
-            Write-Host "# Sigma Analysis ↓↓↓↓↓";
+            Write-Host "# Sigma Analysis";
             $stats = "High: $($j.data.attributes.sigma_analysis_stats.high) / Critical: $($j.data.attributes.sigma_analysis_stats.critical) / Medium: $($j.data.attributes.sigma_analysis_stats.medium) / Low: $($j.data.attributes.sigma_analysis_stats.low)";
             if ($j.data.attributes.sigma_analysis_stats.high -gt 0 -Or $j.data.attributes.sigma_analysis_stats.critical -gt 0) {
                 Write-Host -ForegroundColor Red $stats;
@@ -308,9 +309,9 @@ function Report {
                 $msg = "- $($v.ruleset_name).$($v.rule_name) from $($v.source)`n$($v.description)";
                 Write-Host -ForegroundColor Red $msg;
             }
-            Write-Host "# Sigma Analysis ↑↑↑↑↑";
+            Write-Host "";
         }
-        Read-Host -Prompt "Press enter to finish...";
+        Read-Host -Prompt "Press enter to proceed...";
     }
 }
 
@@ -328,3 +329,5 @@ switch ($result) {
     0 { Open-All }
     1 { Report }
 }
+
+Read-Host -Prompt "Press enter to exit...";
