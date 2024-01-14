@@ -5,3 +5,5 @@ The powershell scripts expects file paths as arguments and upload the files to V
 The additional bat file enables "drag&drop to scan" on Windows.
 
 All 3 files are supposed to be in same directory. 
+
+[Limited access to VirusTotal API is available to registered users for free.](https://www.virustotal.com/gui/my-apikey)
