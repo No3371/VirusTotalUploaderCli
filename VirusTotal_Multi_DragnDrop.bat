@@ -1,0 +1,1 @@
+start powershell -File "%~dp0VirusTotal_Multi.ps1" %*
