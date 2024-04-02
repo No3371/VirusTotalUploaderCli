@@ -7,13 +7,44 @@ $failed = @()
 
 foreach ($file in $Args) {
     $PATH_TO_FILE = $file;
-    Write-Host "> $PATH_TO_FILE`n  Uploading...." -NoNewline;
-    [string]$result = curl.exe --request POST `
-    --header 'accept: application/json' `
-        --header 'content-type: multipart/form-data' `
-        --header "x-apikey: ${API_KEY}" `
-        --form "file=@$PATH_TO_FILE" `
-        'https://www.virustotal.com/api/v3/files' -s -w "!$%!#^&@!!%{http_code}";
+
+    $Size = Get-ItemProperty $PATH_TO_FILE | Select-Object -ExpandProperty Length
+
+    if ($Size -ge 650*1024*1024)
+    {
+        Write-Error "Skipping $(file): File bigger than 650 mb is not supported by VirusTotal.";
+        continue
+    }
+    elseif ($Size -ge 32*1024*1024)
+    {
+        Write-Host "> $PATH_TO_FILE`n  Retrieving large file endpoint...." -NoNewline;
+        [string]$endpointResp = curl.exe --request GET `
+            --header "x-apikey: ${API_KEY}" `
+            'https://www.virustotal.com/api/v3/files/upload_url' -s;
+
+        $j = $endpointResp | ConvertFrom-Json;
+        $endpoint = $j.data;
+
+        Write-Host "> $PATH_TO_FILE`n  Uploading to $endpoint...`n" -NoNewline;
+        [string]$result = curl.exe --request POST `
+        --header 'accept: application/json' `
+            --header 'content-type: multipart/form-data' `
+            --header "x-apikey: ${API_KEY}" `
+            --form "file=@$PATH_TO_FILE" `
+            $endpoint -s -w "!$%!#^&@!!%{http_code}";
+        
+        # Write-Host $result;
+    }
+    else
+    {
+        Write-Host "> $PATH_TO_FILE`n  Uploading...." -NoNewline;
+        [string]$result = curl.exe --request POST `
+        --header 'accept: application/json' `
+            --header 'content-type: multipart/form-data' `
+            --header "x-apikey: ${API_KEY}" `
+            --form "file=@$PATH_TO_FILE" `
+            'https://www.virustotal.com/api/v3/files' -s -w "!$%!#^&@!!%{http_code}";
+    }
         
     Write-Host "Done!";
     if( -not $? )
@@ -43,13 +74,27 @@ foreach ($file in $Args) {
         continue
     }
 
-    $json = curl.exe `
+    if ($Size -ge 32*1024*1024)
+    {
+        Start-Sleep -Seconds 3
+    }
+
+    for ($i = 0; $i -lt 3; $i++) { # retry
+        $json = curl.exe `
         --header 'accept: application/json' `
         --header "x-apikey: ${API_KEY}" `
         $url -s;
          
-    $j = $json | ConvertFrom-Json;
-    $sha256 = $j.meta.file_info.sha256;
+        $j = $json | ConvertFrom-Json;
+        $sha256 = $j.meta.file_info.sha256;
+
+        if ($null -eq $sha256) {
+            Write-Error 'Invalid data, no sha256 given, retrying...'
+            continue
+        }
+
+        break
+    }
 
     if ($null -eq $sha256) {
         Write-Error 'Invalid data, no sha256 given, skipping...'
@@ -82,6 +127,7 @@ if ($failed.Count -gt 0) {
 
 if ($sha256s.Count -eq 0) {
     Read-Host -Prompt "Uploaded 0 file. Press enter to exit...";
+    Exit
 }
 
 function Open-All {
